@@ -9,7 +9,14 @@ if(!extension_loaded('gmagick')) die('skip');
 <?php
 $gd = new GMagickDraw();
 $gd->setFillOpacity(0.8);
-echo $gd->getFillOpacity();
+// GraphicsMagick 1.3.47 rebuilt the drawing wand on magick/draw.c ("drawing_wand.c
+// functions which duplicate code in magick/draw.c are gutted"): since then the
+// opacity that was set comes back; before, the getter returned 1 - opacity.
+$gm = new Gmagick();
+$version = $gm->getVersion();
+preg_match('/GraphicsMagick (\d+\.\d+\.\d+)/', $version['versionString'], $m);
+$expected = version_compare($m[1], '1.3.47', '>=') ? 0.8 : 0.2;
+var_dump(abs($gd->getFillOpacity() - $expected) < 0.0001);
 ?>
 --EXPECT--
-0.2
+bool(true)

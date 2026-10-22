@@ -102,7 +102,8 @@ for t in "$@"; do
         # the start of each failed test's diff (- expected, + actual) for the report
         sed -n 's/.*\[\(tests\/[^]]*\)\.phpt\].*/\1/p' "$out/tests.txt" | while IFS= read -r tn; do
             echo "== $tn"
-            head -n 8 "$bld/$tn.diff" 2>/dev/null | cut -c1-160
+            # awk: a diff without a final newline must not run into the next header
+            awk 'NR <= 8 { print substr($0, 1, 160) }' "$bld/$tn.diff" 2>/dev/null
         done > "$out/tests-diff.txt"
         if grep -q -E '^Tests passed' "$out/tests.lines"; then
             echo "tests:    $(grep -E '^(Number of tests|Tests (skipped|warned|failed|passed))' "$out/tests.lines" |

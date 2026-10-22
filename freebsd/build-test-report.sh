@@ -25,6 +25,10 @@ for dir in "$res"/*/; do
             echo "failed tests ($(wc -l < "$dir/tests.txt" | tr -d ' ')):"
             head -n 40 "$dir/tests.txt" | cut -c1-160
         fi
+        if [ -s "$dir/tests-tail.txt" ]; then
+            echo "end of the make test output:"
+            cat "$dir/tests-tail.txt"
+        fi
     } > "$dir/report.txt"
     echo "==================== $target"
     cat "$dir/report.txt"

@@ -1,0 +1,67 @@
+name: Build test on FreeBSD
+
+# Builds gmagick as a shared module (phpize) against the PHP builds of
+# azsupport/php-src (the freebsd-<version>-latest release tarballs) in a FreeBSD VM,
+# loads it and writes a PNG: one annotation per PHP version on the run page.
+# Started by hand: Actions, "Build test on FreeBSD", "Run workflow"; and on pushes
+# to the fbsd branches.
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'PHP versions, separated by spaces (5.6 is on the branch fbsd-1.1)'
+        required: true
+        default: '7.4 8.1 8.2 8.3 8.4'
+      release:
+        description: 'FreeBSD release'
+        required: true
+        default: '15.1'
+      tests:
+        description: 'Also run the .phpt tests of gmagick'
+        type: boolean
+        default: true
+  push:
+    branches: [fbsd, fbsd-1.1]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freebsd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TARGETS: ${{ inputs.targets || (github.ref_name == 'fbsd-1.1' && '5.6' || '7.4 8.1 8.2 8.3 8.4') }}
+      RELEASE: ${{ inputs.release || '15.1' }}
+      TESTS: ${{ (github.event_name == 'push' || inputs.tests) && '--tests' || '' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download the PHP release tarballs of azsupport/php-src
+        run: |
+          mkdir -p dist
+          for t in $TARGETS; do
+            for f in "php-$t-fbsd-latest.tar.xz" "php-$t-fbsd-latest.tar.xz.sha256"; do
+              curl -fsSL -o "dist/$f" "https://github.com/azsupport/php-src/releases/download/freebsd-$t-latest/$f"
+            done
+          done
+          cd dist && sha256sum -c ./*.sha256
+
+      - name: Build in FreeBSD ${{ env.RELEASE }}
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: ${{ env.RELEASE }}
+          envs: 'TARGETS TESTS'
+          prepare: |
+            sh freebsd/build-test.sh --deps
+          run: |
+            sh freebsd/build-test.sh $TESTS $TARGETS || true
+
+      - name: Report
+        if: always()
+        run: sh freebsd/build-test-report.sh results

@@ -86,8 +86,11 @@ for t in "$@"; do
     esac
 
     if [ "$tests" = 1 ]; then
-        say "$t: make test"
-        (cd "$bld" && NO_INTERACTION=1 REPORT_EXIT_STATUS=0 make test TEST_PHP_ARGS="-q" > "$out/tests.log" 2>&1)
+        say "$t: run-tests"
+        # run-tests.php directly (phpize copies it here): "make test" under BSD make
+        # handed it a broken argument list and only printed its usage.
+        (cd "$bld" && env NO_INTERACTION=1 REPORT_EXIT_STATUS=0 TEST_PHP_EXECUTABLE="$prefix/bin/php" \
+            "$prefix/bin/php" -n run-tests.php -q -n -d "extension=$so" tests > "$out/tests.log" 2>&1 < /dev/null)
         # One result per line: colours, carriage returns and "TEST n/m [...]" progress
         # removed (run-tests rewrites its progress line with \r).
         tr -d '\033' < "$out/tests.log" | sed -E 's/\[[0-9;]*m//g' | tr '\r' '\n' |

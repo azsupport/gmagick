@@ -35,5 +35,11 @@ for dir in "$res"/*/; do
     if grep -q '^result: *OK' "$dir/summary.txt"; then level=notice; else level=error; rc=1; fi
     printf '::%s title=gmagick on PHP %s::%s\n' "$level" "$target" "$(head -c 3800 "$dir/report.txt" | escape)"
     { echo "### PHP $target"; echo; echo '```'; cat "$dir/report.txt"; echo '```'; echo; } >> "$summary"
+    # the diffs of the failed tests in an annotation of their own (warning: notices
+    # and warnings are counted separately, 10 of each per step)
+    if [ -s "$dir/tests-diff.txt" ]; then
+        printf '::warning title=gmagick on PHP %s, failed tests::%s\n' "$target" "$(head -c 3800 "$dir/tests-diff.txt" | escape)"
+        { echo "#### PHP $target, failed tests"; echo; echo '```'; cat "$dir/tests-diff.txt"; echo '```'; echo; } >> "$summary"
+    fi
 done
 exit "$rc"

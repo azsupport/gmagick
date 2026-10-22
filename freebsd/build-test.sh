@@ -23,7 +23,10 @@ say() { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*"; }
 
 if [ "${1:-}" = "--deps" ]; then
     shift
-    env ASSUME_ALWAYS_YES=yes pkg install -y pkgconf GraphicsMagick autoconf
+    # webfonts: the fonts that the text tests (annotate, queryFontMetrics, ...) draw
+    # with; the GraphicsMagick port looks for Windows fonts there
+    # (--with-windows-font-dir) and its own tests depend on it as well.
+    env ASSUME_ALWAYS_YES=yes pkg install -y pkgconf GraphicsMagick autoconf webfonts
     exit $?
 fi
 tests=0
@@ -96,6 +99,11 @@ for t in "$@"; do
         tr -d '\033' < "$out/tests.log" | sed -E 's/\[[0-9;]*m//g' | tr '\r' '\n' |
             sed -E 's/^TEST [0-9]+\/[0-9]+ \[[^]]*\] *//' > "$out/tests.lines"
         grep -E '^FAIL ' "$out/tests.lines" > "$out/tests.txt"
+        # the start of each failed test's diff (- expected, + actual) for the report
+        sed -n 's/.*\[\(tests\/[^]]*\)\.phpt\].*/\1/p' "$out/tests.txt" | while IFS= read -r tn; do
+            echo "== $tn"
+            head -n 8 "$bld/$tn.diff" 2>/dev/null | cut -c1-160
+        done > "$out/tests-diff.txt"
         if grep -q -E '^Tests passed' "$out/tests.lines"; then
             echo "tests:    $(grep -E '^(Number of tests|Tests (skipped|warned|failed|passed))' "$out/tests.lines" |
                 tr -s ' ' | sed 's/ :/:/' | tr '\n' ',' | sed 's/,$//; s/,/, /g')" >> "$sum"

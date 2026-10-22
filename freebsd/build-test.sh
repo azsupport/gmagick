@@ -88,8 +88,18 @@ for t in "$@"; do
     if [ "$tests" = 1 ]; then
         say "$t: make test"
         (cd "$bld" && NO_INTERACTION=1 REPORT_EXIT_STATUS=0 make test TEST_PHP_ARGS="-q" > "$out/tests.log" 2>&1)
-        grep -E '^FAIL ' "$out/tests.log" > "$out/tests.txt" 2>/dev/null
-        echo "tests:    $(grep -c -E '^PASS ' "$out/tests.log") passed, $(grep -c -E '^FAIL ' "$out/tests.log") failed, $(grep -c -E '^SKIP ' "$out/tests.log") skipped" >> "$sum"
+        # One result per line: colours, carriage returns and "TEST n/m [...]" progress
+        # removed (run-tests rewrites its progress line with \r).
+        tr -d '\033' < "$out/tests.log" | sed -E 's/\[[0-9;]*m//g' | tr '\r' '\n' |
+            sed -E 's/^TEST [0-9]+\/[0-9]+ \[[^]]*\] *//' > "$out/tests.lines"
+        grep -E '^FAIL ' "$out/tests.lines" > "$out/tests.txt"
+        if grep -q -E '^Tests passed' "$out/tests.lines"; then
+            echo "tests:    $(grep -E '^(Number of tests|Tests (skipped|warned|failed|passed))' "$out/tests.lines" |
+                tr -s ' ' | sed 's/ :/:/' | tr '\n' ',' | sed 's/,$//; s/,/, /g')" >> "$sum"
+        else
+            echo "tests:    $(grep -c -E '^PASS ' "$out/tests.lines") passed, $(grep -c -E '^FAIL ' "$out/tests.lines") failed, $(grep -c -E '^SKIP ' "$out/tests.lines") skipped; no run-tests summary, end of the log in tests-tail.txt" >> "$sum"
+            tail -n 15 "$out/tests.log" | cut -c1-200 > "$out/tests-tail.txt"
+        fi
     fi
     echo "result:   OK" >> "$sum"
     say "$t: OK ($smoke)"
